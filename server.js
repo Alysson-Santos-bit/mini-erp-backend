@@ -105,6 +105,43 @@ app.post('/login', async (req, res) => {
     res.status(500).json({ mensagem: 'Erro ao fazer login.' });
   }
 });
+// ==========================================
+// O SEGURANÇA DA PORTA (MIDDLEWARE)
+// ==========================================
+function verificarCracha(req, res, next) {
+  // 1. O segurança pede para ver o crachá (ele vem no cabeçalho Authorization)
+  const cabecalho = req.headers['authorization'];
+  
+  // 2. Se a pessoa veio sem crachá nenhum, é barrada na hora!
+  if (!cabecalho) {
+    return res.status(401).json({ mensagem: '❌ Acesso negado! Você precisa estar logado.' });
+  }
+
+  // 3. O crachá chega no formato "Bearer eyJhbG...". Nós cortamos a palavra "Bearer" e pegamos só o código.
+  const token = cabecalho.split(' ')[1];
+
+  try {
+    // 4. A máquina de validação: O segurança confere a assinatura digital usando a sua senha do .env
+    const segredo = process.env.JWT_SECRET || 'minha_chave_reserva_de_emergencia';
+    const crachaValido = jwt.verify(token, segredo);
+    
+    // 5. O crachá é verdadeiro! O segurança anota o ID do usuário e abre a porta!
+    req.usuario = crachaValido; // (Isso nos permite saber quem fez a requisição nas rotas)
+    
+    next(); // 🪄 A MÁGICA: O comando next() deixa a requisição continuar para a rota!
+    
+  } catch (erro) {
+    // Se um hacker tentar inventar um token falso ou se o token estiver vencido
+    return res.status(403).json({ mensagem: '❌ Crachá inválido ou expirado!' });
+  }
+}
+
+// ⚠️ A BARREIRA INTRANSPONÍVEL ⚠️
+// Ao colocar este comando aqui, TODAS as rotas que estiverem ESCRITAS ABAIXO desta linha
+// vão obrigatoriamente passar pelo Segurança antes de funcionarem!
+app.use(verificarCracha);
+
+
 
 // ==========================================
 // --- ROTAS DE CLIENTES ---
@@ -200,6 +237,22 @@ app.put('/tarefas/:id', (req, res) => {
     });
 });
 
+// 3.5 Rota para EDITAR O TEXTO de uma tarefa (PUT)
+app.put('/tarefas/:id/titulo', (req, res) => {
+    const { id } = req.params;
+    const { titulo } = req.body; 
+
+    const sql = 'UPDATE tarefas SET titulo = ? WHERE id = ?';
+
+    db.query(sql, [titulo, id], (erro, resultado) => {
+        if (erro) {
+            console.error('❌ Erro ao editar tarefa:', erro.message);
+            return res.status(500).json({ erro: 'Erro ao editar a tarefa.' });
+        }
+        res.status(200).json({ mensagem: '✅ Tarefa editada com sucesso!' });
+    });
+});
+
 // 4. Rota para DELETAR uma tarefa (DELETE)
 app.delete('/tarefas/:id', (req, res) => {
     const { id } = req.params;
@@ -208,6 +261,27 @@ app.delete('/tarefas/:id', (req, res) => {
     db.query(sql, [id], (erro, resultado) => {
         if (erro) return res.status(500).json({ erro: 'Erro ao deletar tarefa.' });
         res.status(200).json({ mensagem: '✅ Tarefa deletada com sucesso!' });
+    });
+});
+// ==========================================
+// --- ROTA DE ESTATÍSTICAS (DASHBOARD) ---
+// ==========================================
+app.get('/estatisticas', (req, res) => {
+    // Uma única consulta SQL poderosa que conta tudo usando sub-consultas!
+    const sql = `
+        SELECT 
+            (SELECT COUNT(*) FROM clientes) as totalClientes,
+            (SELECT COUNT(*) FROM tarefas) as totalTarefas,
+            (SELECT COUNT(*) FROM tarefas WHERE concluida = 1) as tarefasConcluidas
+    `;
+
+    db.query(sql, (erro, resultados) => {
+        if (erro) {
+            console.error('❌ Erro ao buscar estatísticas:', erro.message);
+            return res.status(500).json({ erro: 'Erro ao buscar estatísticas.' });
+        }
+        // O MySQL devolve um array. Queremos apenas o primeiro item (o objeto com as contagens)
+        res.status(200).json(resultados[0]);
     });
 });
 
