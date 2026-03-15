@@ -264,6 +264,55 @@ app.delete('/tarefas/:id', (req, res) => {
     });
 });
 // ==========================================
+// --- ROTAS DE PRODUTOS (MÓDULO ERP) ---
+// ==========================================
+
+// 1. Rota para CRIAR um produto (POST)
+app.post('/produtos', (req, res) => {
+    const { nome, preco, estoque } = req.body;
+    const sql = 'INSERT INTO produtos (nome, preco, estoque) VALUES (?, ?, ?)';
+
+    db.query(sql, [nome, preco, estoque], (erro, resultado) => {
+        if (erro) {
+            console.error('❌ Erro ao cadastrar produto:', erro.message);
+            return res.status(500).json({ erro: 'Erro ao cadastrar produto.' });
+        }
+        res.status(201).json({ mensagem: '✅ Produto cadastrado com sucesso!', id: resultado.insertId });
+    });
+});
+
+// 2. Rota para LER todos os produtos (GET)
+app.get('/produtos', (req, res) => {
+    const sql = 'SELECT * FROM produtos';
+    db.query(sql, (erro, resultados) => {
+        if (erro) return res.status(500).json({ erro: 'Erro ao buscar produtos.' });
+        res.status(200).json(resultados);
+    });
+});
+
+// 3. Rota para ATUALIZAR um produto (PUT)
+app.put('/produtos/:id', (req, res) => {
+    const { id } = req.params;
+    const { nome, preco, estoque } = req.body;
+    const sql = 'UPDATE produtos SET nome = ?, preco = ?, estoque = ? WHERE id = ?';
+
+    db.query(sql, [nome, preco, estoque, id], (erro, resultado) => {
+        if (erro) return res.status(500).json({ erro: 'Erro ao atualizar produto.' });
+        res.status(200).json({ mensagem: '✅ Produto atualizado com sucesso!' });
+    });
+});
+
+// 4. Rota para DELETAR um produto (DELETE)
+app.delete('/produtos/:id', (req, res) => {
+    const { id } = req.params;
+    const sql = 'DELETE FROM produtos WHERE id = ?';
+
+    db.query(sql, [id], (erro, resultado) => {
+        if (erro) return res.status(500).json({ erro: 'Erro ao deletar produto.' });
+        res.status(200).json({ mensagem: '✅ Produto deletado com sucesso!' });
+    });
+});
+// ==========================================
 // --- ROTA DE ESTATÍSTICAS (DASHBOARD) ---
 // ==========================================
 app.get('/estatisticas', (req, res) => {
